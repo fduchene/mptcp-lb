@@ -1,0 +1,194 @@
+---
+title: Multipath TCP Load Balancing
+abbrev: MPTCP LB
+docname: draft-duchene-mptcp-load-balancing-00
+date: 2016-08-10
+category: exp
+
+
+ipr: trust200902
+area: Transport
+workgroup: MPTCP Working Group
+keyword: Internet-Draft
+
+stand_alone: yes
+pi: [toc, sortrefs, symrefs]
+
+author:
+ -
+  ins: F. Duchene
+  name: Fabien Duchene
+  organization: UCLouvain
+  email: fabien.duchene@uclouvain.be
+ -
+  ins: O. Bonaventure
+  name: Olivier Bonaventure
+  organization: UCLouvain
+  email: Olivier.Bonaventure@uclouvain.be
+
+
+normative:
+  RFC6824:
+
+informative:
+  RFC6182:
+  RFC1323:
+  RFC0793:
+  RFC7430:
+  I-D.ietf-mptcp-rfc6824bis:
+
+--- abstract
+
+Multipath TCP {{RFC6824}} may not work behind load balancers. 
+In this document we propose several solutions to allow Multipath TCP
+to work behind load balancers.
+
+--- middle
+
+Introduction
+============
+
+Multipath TCP is an extension to TCP {{RFC0793}} that was specified
+in {{RFC6824}}. Multipath TCP allows hosts to use multiple paths
+to send and receive the data belonging to one connection. For this,
+a Multipath TCP is composed of several TCP connections that
+are called subflows. 
+
+Many large web sites are served by servers that are behind a load balancer.
+The load balancer receives the connection establishment attempts and
+forwards them to the actual servers that serve the requests. One issue for
+the end-to-end deployment of Multipath TCP is it ability to be used on
+load-balancers. Different types of load balancers are possible. We consider
+a simple but important load balancer than does not maintain any per-flow
+state. This load balancer is illustrated in illustrated in 
+{{fig-lb}}. A stateless load balancer can be implemented by hashing
+the five tuple (IP addresses and port numbers) of each incoming packet
+and forward them to one of the servers based on the hash value computed.
+With TCP, this load balancer ensures that all the packets that belong to
+one TCP connection are sent to the same server. 
+
+
+~~~~
+
+   +--+---- S1
+---|LB|---- S2
+   +--+---- S3
+
+~~~~
+{: #fig-lb title="Stateless load balancer"}
+
+
+With Multipath TCP, this approach cannot be used anymore when subflows are
+created by the clients. Such subflows can use any five tuple and thus packets
+belonging to them will be forwarded over any server, not necessarily the
+one that was selected by the hashing function for the initial subflow.
+
+In this document, we propose several solutions to allow Multipath TCP to work 
+behind load balancers.
+
+Proposed solutions {#solutions}
+=========================
+
+Modification of the protocol {#protocol}
+----------------------------
+
+To allow Multipath TCP to work for hosts being hosted behind unmodified
+layer 4 load balancers, we propose to use the unused \"B\" flag in the
+MP\_CAPABLE  option sent (shown in {{fig-mpcap}} in the SYN+ACK. 
+This flag would allow a host behind a layer 4 load balancer to inform 
+the other host that this address  MUST NOT be used to create 
+additional subflows.
+
+A host receiving an MP\_CAPABLE with the \"B\" set to 1 MUST NOT try to 
+establish a subflow to the address used in the MP\_CAPABLE. This bit can
+also be used in the MP\_CAPABLE option sent in the SYN by a client that
+resides behind a NAT or firewall or does not accept server-initiated 
+subflows.
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+                     1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++---------------+---------------+-------+-------+---------------+
+|     Kind      |    Length     |Subtype|Version|A|B|C|D|E|F|G|H|
++---------------+---------------+-------+-------+---------------+
+|                   Option Sender's Key (64 bits)               |
+|                      (if option Length > 4)                   |
+|                                                               |
++---------------------------------------------------------------+
+|                  Option Receiver's Key (64 bits)              |
+|                      (if option Length > 12)                  |
+|                                                               |
++-------------------------------+-------------------------------+
+|  Data-Level Length (16 bits)  |  Checksum (16 bits, optional) |
++-------------------------------+-------------------------------+
+
+~~~~~~~~~~~~~~~~~~~~~~
+{: #fig-mpcap title="Multipath Capable (MP_CAPABLE) Option"}
+
+This bit can be used by the servers behind a stateless load balancers.
+Each of these servers has a different IP address than the address of the
+load balancer. The servers set the \"B\" flag in the MP\_CAPABLE
+option that they return and advertise their own address by using the 
+ADD\_ADDR option. Upon reception of this option, the clients can
+create the additional subflows towards these addresses. Compared with
+current stateless load balancers, an advantage of this approach is
+that the packets belonging to the additional subflows do not need
+to pass through the load balancer.
+
+Stateful MPTCP aware Load Balancer (ULG)
+------------------------------------------
+
+
+MPLB (Costin and Vlad)
+----------------------
+
+
+Application Layer Authentication (Christoph, Alan)
+--------------------------------------------------
+
+
+Recommandations
+================
+
+IANA considerations
+===================
+
+This document proposes some modifications to the Multipath TCP options
+defined in {{RFC6824}}. These modifications do not require any
+specific action from IANA.
+
+Security considerations
+=======================
+
+The security considerations defined for Multipath TCP in 
+{{RFC6182}}  and {{RFC7430}} are applicable. 
+
+The ``E`` flag, community and priority values in the ADD\_ADDR option 
+do not change the security considerations for the handling of this option.
+Since the ADD\_ADDR option is protected by an HMAC, an off-path attacker
+cannot inject such an option in an existing Multipath TCP connection.
+
+The ``priority`` field of the MP\_PRIO option is not protected by a
+HMAC. It could be useful to consider the utilisation of an HMAC to
+protect this option like the ADD\_ADDR option. 
+
+The ``B`` flag of the MP\_CAPABLE option does not change the security 
+considerations of this option. If an attacker that resides
+on a path sets this bit, it could prevent the establishment of subflows.
+However, Multipath TCP does not protect against an attacker that resides
+on the path of the initial subflow and can modify the SYN/SYN+ACK
+packets. 
+
+
+Conclusion
+==========
+
+In this document, we have discussed several issues with the
+advertisement of addresses with the address advertisement in
+Multipath TCP. We have proposed several modifications to the protocol
+to address these issues.
+
+--- back
+
+
