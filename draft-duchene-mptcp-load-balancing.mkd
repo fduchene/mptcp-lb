@@ -51,21 +51,21 @@ Introduction
 Multipath TCP is an extension to TCP {{RFC0793}} that was specified
 in {{RFC6824}}. Multipath TCP allows hosts to use multiple paths
 to send and receive the data belonging to one connection. For this,
-a Multipath TCP is composed of several TCP connections that
+a Multipath TCP connection is composed of several TCP connections that
 are called subflows. 
 
 Many large web sites are served by servers that are behind a load balancer.
 The load balancer receives the connection establishment attempts and
 forwards them to the actual servers that serve the requests. One issue for
-the end-to-end deployment of Multipath TCP is it ability to be used on
+the end-to-end deployment of Multipath TCP is its ability to be used on
 load-balancers. Different types of load balancers are possible. We consider
-a simple but important load balancer than does not maintain any per-flow
-state. This load balancer is illustrated in illustrated in 
+a simple but important load balancer that does not maintain any per-flow
+state. This load balancer is illustrated in
 {{fig-lb}}. A stateless load balancer can be implemented by hashing
 the five tuple (IP addresses and port numbers) of each incoming packet
 and forward them to one of the servers based on the hash value computed.
 With TCP, this load balancer ensures that all the packets that belong to
-one TCP connection are sent to the same server. 
+one TCP connection are sent to the same server.
 
 
 ~~~~
@@ -80,10 +80,10 @@ one TCP connection are sent to the same server.
 
 With Multipath TCP, this approach cannot be used anymore when subflows are
 created by the clients. Such subflows can use any five tuple and thus packets
-belonging to them will be forwarded over any server, not necessarily the
+belonging to them will be forwarded to any server, not necessarily the
 one that was selected by the hashing function for the initial subflow.
 
-In this document, we propose several solutions to allow Multipath TCP to work 
+In this document, we propose several solutions to allow Multipath TCP to work
 behind load balancers.
 
 Proposed solutions {#solutions}
@@ -126,7 +126,7 @@ subflows.
 ~~~~~~~~~~~~~~~~~~~~~~
 {: #fig-mpcap title="Multipath Capable (MP_CAPABLE) Option"}
 
-This bit can be used by the servers behind a stateless load balancers.
+This bit can be used by the servers behind a stateless load balancer.
 Each of these servers has a different IP address than the address of the
 load balancer. The servers set the \"B\" flag in the MP\_CAPABLE
 option that they return and advertise their own address by using the 
@@ -161,33 +161,12 @@ specific action from IANA.
 Security considerations
 =======================
 
-The security considerations defined for Multipath TCP in 
-{{RFC6182}}  and {{RFC7430}} are applicable. 
-
-The ``E`` flag, community and priority values in the ADD\_ADDR option 
-do not change the security considerations for the handling of this option.
-Since the ADD\_ADDR option is protected by an HMAC, an off-path attacker
-cannot inject such an option in an existing Multipath TCP connection.
-
-The ``priority`` field of the MP\_PRIO option is not protected by a
-HMAC. It could be useful to consider the utilisation of an HMAC to
-protect this option like the ADD\_ADDR option. 
-
-The ``B`` flag of the MP\_CAPABLE option does not change the security 
-considerations of this option. If an attacker that resides
-on a path sets this bit, it could prevent the establishment of subflows.
-However, Multipath TCP does not protect against an attacker that resides
-on the path of the initial subflow and can modify the SYN/SYN+ACK
-packets. 
-
+TBD
 
 Conclusion
 ==========
 
-In this document, we have discussed several issues with the
-advertisement of addresses with the address advertisement in
-Multipath TCP. We have proposed several modifications to the protocol
-to address these issues.
+TBD
 
 --- back
 
