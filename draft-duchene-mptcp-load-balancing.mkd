@@ -169,6 +169,9 @@ MPLB (Costin and Vlad)
 Application Layer Authentication (Christoph, Alan)
 --------------------------------------------------
 
+Comparaison of the solutions
+=============================
+
 
 Recommandations
 ================
@@ -190,14 +193,6 @@ could connect directly to this address for the folowing connections.
 This aspect should be studied, to provent a client for establishing anything else than
 a secondary subflow on this IP address.
 
-
-
-
-
-
-
-
-TBD
 
 Conclusion
 ==========
