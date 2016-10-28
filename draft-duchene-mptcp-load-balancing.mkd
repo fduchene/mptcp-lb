@@ -136,8 +136,30 @@ current stateless load balancers, an advantage of this approach is
 that the packets belonging to the additional subflows do not need
 to pass through the load balancer.
 
-Stateful MPTCP aware Load Balancer (ULG)
-------------------------------------------
+To demonstrate the principle of an off path load balancer let's consider
+a server behind a load balancer.
+
+~~~~~~~~~~
+         +-- ADSL --+  +-- Load Balancer --+--- ADDR 1 ---+
+         |          |  |                                  |
+client --+          +--+	                          +--- Server
+         |          |  |                                  |
+         +-- LTE  --+  +------------- ADDR 2 -------------+
+~~~~~~~~~~
+{: #fig-servlb title="A server with 2 addresse."}
+
+
+As shown in figure {{fig-servlb}}, this server has 2 IP addresses:
+1 behind the load balancer and 1 direclty connected to the Internet.
+The client will send a SYN containing an MP\_CAPABLE, the server will
+answer with a SYN+ACK containing an MP\_CAPABLE with the \"B\" flag
+set to 1.
+Upon reception of the SYN+ACK, the client will now that it cannot establish
+any more subflow with this IP address.
+The load balancer will then advertise it's secondary address with an ADD\_ADDR.
+Once the client has established at least one connection to the secondary IP
+address, the server could elect to close the primary subflow or to put it in
+backup mode.
 
 
 MPLB (Costin and Vlad)
@@ -160,6 +182,20 @@ specific action from IANA.
 
 Security considerations
 =======================
+
+Modification of the protocol
+----------------------------
+If the server has a secondary address, a client having learned that IP address
+could connect directly to this address for the folowing connections.
+This aspect should be studied, to provent a client for establishing anything else than
+a secondary subflow on this IP address.
+
+
+
+
+
+
+
 
 TBD
 
