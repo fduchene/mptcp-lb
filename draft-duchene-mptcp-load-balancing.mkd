@@ -368,6 +368,24 @@ Application Layer Authentication (Christoph, Alan)
 Comparaison of the solutions
 =============================
 
+Per-server addresses:
+
+- Requires individual public addresses for each of the servers, making IPv6
+almost mandatory.
+- Requires modifications to the clients and servers stack.
+- Is transparent and works with today's load balancers.
+- Doesn't need any modification to the applications.
+- Disclose the real IP address of the servers.
+- Allows to put the load balancer off-path.
+
+Extra Information in Packets:
+
+- Doesn't require an individual public addresses for each of the servers.
+- Requires modifications to the load balancers servers stack.
+- Could be broken by a firewall blocking certain destination ports (proposal 1)
+or changing the value of the timestamps (proposal 2).
+- Doesn't need any modification to the applications.
+- Doesn't disclose the real IP address of the servers.
 
 Recommandations
 ================
