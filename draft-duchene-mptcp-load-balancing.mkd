@@ -361,10 +361,6 @@ protocol in this document.
 
 Redirection of a packet is performed using IP-in-IP encapsulation.
 
-
-Application Layer Authentication (Christoph, Alan)
---------------------------------------------------
-
 Comparaison of the solutions
 =============================
 
@@ -409,8 +405,8 @@ In this document, we have described and compared two solutions to load balance
 MultiPath TCP connections.
 We showed that these two solutions have advantages and drawbacks and cover
 different network configurations.
-Future versions of this draft will include more solutions and discuss security
-considerations.
+Future versions of this draft will include more solutions like the Application
+Layer Authentication and discuss security considerations.
 
 --- back
 
