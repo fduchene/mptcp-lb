@@ -225,7 +225,7 @@ This approach has two drawbacks:
 Because these subflows are loadbalanced based on a hash of their 5-tuple, they will almost certainly reach a different server and break.
 (Using REMOVE\_ADDR to prevent the creation of these subflows would entail
 the destruction of the original subflow.)
-This issue can be solved by the adoption of the protocol modifications outlined in Section 1.
+This issue can be solved by the adoption of the protocol modifications outlined in {{protocol}}.
 
 * If the client is behind a firewall that restricts access to certain destination ports,
 it might not succeed in establishing any new subflows.
@@ -239,7 +239,7 @@ They are embedded in all outgoing TCP timestamps, and subsequently echoed back b
 Incoming packets that do not contain timestamps (such as FINs) are dealt with
 via redirection between the servers.
 	
-#### Connection Initiation
+#### Connection Initiation {#mplb-mpcap}
 
 The client initiates an MPTCP connection by sending a SYN with the MP\_CAPABLE option.
 Under normal operation, the server then picks a random 64-bit key for the connection,
@@ -284,7 +284,7 @@ multiple keys and selects one that yields a token with the same 14 highest-order
 The use of the alternate server IP will be discussed in a later section.
 
 	
-#### Handling MP_JOIN packets
+#### Handling MP_JOIN packets {#mplb-mpjoin}
 
 Additional subflows are initiated by the client by sending MP_JOIN packets.
 These packets contain the server's token.
@@ -350,7 +350,7 @@ Some packets (most notably FINs) do not contain timestamps or any other
 connection-identifying information.
 As such, they are forwarded to a server based on a hash of the 5-tuple.
 
-As seen in Section 2.2.2.1 and Section 2.2.2.2,
+As seen in {{mplb-mpcap}} and {{mplb-mpjoin}},
 whenever a new subflow is setup, the server responsible for it (A) also knows
 which other server (B) would be hit by the packets in case 5-tuple hashing is used.
 
