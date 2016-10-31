@@ -405,7 +405,12 @@ Security considerations will be discussed in the next version of this draft.
 Conclusion
 ==========
 
-TBD
+In this document, we have described and compared two solutions to load balance
+MultiPath TCP connections.
+We showed that these two solutions have advantages and drawbacks and cover
+different network configurations.
+Future versions of this draft will include more solutions and discuss security
+considerations.
 
 --- back
 
