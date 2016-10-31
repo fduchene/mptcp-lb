@@ -400,13 +400,7 @@ specific action from IANA.
 Security considerations
 =======================
 
-Modification of the protocol
-----------------------------
-If the server has a secondary address, a client having learned that IP address
-could connect directly to this address for the folowing connections.
-This aspect should be studied, to provent a client for establishing anything else than
-a secondary subflow on this IP address.
-
+Security considerations will be discussed in the next version of this draft.
 
 Conclusion
 ==========
