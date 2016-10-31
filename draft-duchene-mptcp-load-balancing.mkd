@@ -25,10 +25,22 @@ author:
   name: Olivier Bonaventure
   organization: UCLouvain
   email: Olivier.Bonaventure@uclouvain.be
+ -
+  ins: V. Olteanu
+  name: Vladimir Olteanu
+  organization: University Politehnica of Bucharest
+  email: vladimir.olteanu@cs.pub.ro
+ -
+  ins: C. Raiciu
+  name: Costin Raiciu
+  organization: University Politehnica of Bucharest
+  email: costin.raiciu@cs.pub.ro
 
 
 normative:
   RFC6824:
+  RFC0791:
+  RFC7323:
 
 informative:
   RFC6182:
@@ -66,7 +78,6 @@ the five tuple (IP addresses and port numbers) of each incoming packet
 and forward them to one of the servers based on the hash value computed.
 With TCP, this load balancer ensures that all the packets that belong to
 one TCP connection are sent to the same server.
-
 
 ~~~~
 
@@ -162,8 +173,179 @@ address, the server could elect to close the primary subflow or to put it in
 backup mode.
 
 
-MPLB (Costin and Vlad)
-----------------------
+Embedding Extra Information in Packets
+-------------------------------------------------
+
+Under some circumstances, addressing the individial servers via tieir individial IPs is not desirable or feasible.
+To work around this issue, we propose two mutually-exclusive solutions.
+They rely to varying degrees on getting the client to embed connection or server-identifying
+information in the packets that it sends out. This extra information can be used statelessly by the loadbalancers.
+
+Both solutions require modifications only to the server stack and work well with
+existing MPTCP clients.
+
+### Proposal 1
+
+Our first proposal revolves around controlling the destination port
+that the client uses in all subflows aside from the initial one.
+It is possible for the server to advertise an additional port via the
+ADD_ADDR option {{RFC6824}}. This informs the client
+that it can send an MP_JOIN to this new port and initiate a new subflow.
+
+To take advantage of this,
+each server is be assigned a unique 16-bit ID, which must
+be different from the port on which the service is being hosted (e.g. 80).
+As soon as a connection is initiated, the server sends an
+ADD_ADDR to the client advertising a new port equal to said ID.
+
+Packets that arrive at the loadbalancer are treated as follows:
+
+ * Packets destined to the port that the service is being hosted on will be forwarded
+to a server based on a hash of the 5-tuple.
+
+ * Packets destined to any other port are forwarded to the server whose ID matches
+the destination port.
+
+This approach has two drawbacks:
+
+* The client will most likely also try to initiate subflows using the server's original port.
+Because these subflows are loadbalanced based on a hash of their 5-tuple, they will almost certainly reach a different server and break.
+(Using REMOVE_ADDR to prevent the creation of these subflows would entail
+the destruction of the original subflow.)
+This issue can be solved by the adoption of the protocol modifications outlined in Section 1.
+
+* If the client is behind a firewall that restricts access to certain destination ports,
+it might not succeed in establishing any new subflows.
+
+### Proposal 2
+
+Our second proposal is to loadbalance packets based on the server's token.
+
+The token's most significant 14 bits are treated as a hash value for the connection.
+They are embedded in all outgoing TCP timestamps, and subsequently echoed back by the client.
+Incoming packets that do not contain timestamps (such as FINs) are dealt with
+via redirection between the servers.
+	
+#### Connection Initiation
+
+The client initiates an MPTCP connection by sending a SYN with the MP_CAPABLE option.
+Under normal operation, the server then picks a random 64-bit key for the connection,
+and uses it to compute its token.
+
+To forward the packet appropriately, the loadbalancer must know the token before
+deciding what server to send it to. To accomplish this, we move the key generation
+to the loadbalancer. The connection's token can be computed based on the generated key.
+
+The loadbalancer places the generated key, along with the IP of the server that would
+be responsible for the subflow under normal 5-tuple hashing (which we call the alternate
+server IP) in an IP option and forwards the SYN to the server.
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+                            1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +---------------+---------------+---------------+---------------+
+      |   Type = 96   |  Length = 16  |             Unused            |
+      +---------------+---------------+---------------+---------------+
+      |                                                               |
+      +                          Server Key                           +
+      |                                                               |
+      +---------------+---------------+---------------+---------------+
+      |                      Alternate Server IP                      |
+      +---------------+---------------+---------------+---------------+
+         
+~~~~~~~~~~~~~~~~~~~~~~
+{: #fig-optmpcap title="IP Option Used for MP_CAPABLE packets"}
+
+The figure above depicts the IP option that is inserted into the MP_CAPABLE packet
+before it is sent to the server. We have chosen an IP option despite the fact
+that the data contained therein pertains to the transport layer, because TCP
+option space is very limited. IP option type 96 is currently classified as reserved
+{{RFC0791}}.
+
+Upon receipt of the packet, the server uses the key provided to compute the token
+for the connection. If no connection with the same token exists, the server uses
+the key provided. Otherwise, it takes a brute-force approach and randomly generates
+multiple keys and selects one that yields a token with the same 14 highest-order bits.
+
+The use of the alternate server IP will be discussed in a later section.
+
+	
+#### Handling MP_JOIN packets
+
+Additional subflows are initiated by the client by sending MP_JOIN packets.
+These packets contain the server's token.
+
+Similarly to how MP_CAPABLE packets are treated, the loadbalancer uses an IP option
+to inform the server about which other server would be responsible for the subflow
+under normal 5-tuple hashing.
+
+
+~~~~~~~~~~~~~~~~~~~~~~
+
+                            1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +---------------+---------------+---------------+---------------+
+      |   Type = 97   |   Length = 8  |             Unused            |
+      +---------------+---------------+---------------+---------------+
+      |                      Alternate Server IP                      |
+      +---------------+---------------+---------------+---------------+
+         
+~~~~~~~~~~~~~~~~~~~~~~
+{: #fig-optmpjoin title="IP Option Used for MP_JOIN packets"}
+
+		
+IP option type 97 is also classified as reserved {{RFC0791}}.
+
+	
+#### Embedding the token in the timestamp
+
+The TCP timestamp option {{RFC7323}} is present in most packets
+and is comprised of two fields: the TSval, which is set by the packet's sender,
+and TSecr, which contains a timestamp recently received from the other end.
+
+Taking advantage of the fact that timestamps set by the server are echoed back
+by the client, the server shifts its timestamp clock left by 14 bits, and
+embeds the 14 highest-order bits of the token into the
+14 lowest-order bits of the TSval.
+When a packet with the ACK flag set and with the TS option present arrives at the
+loadbalancer, it is forwarded based on the 14 least significant bits of the TSecr field.
+
+		
+##### Impact on PAWS
+
+Timestamps supplied by the server are used by the client for
+protection against wrapped sequence numbers (PAWS).
+
+We assume that the server uses a timestamp clock frequency of 1 tick per ms,
+which is the highest frequency recommended by {{RFC7323}}.
+The recycling time of the timestamp clock's sign bit is required
+to be greater than the Maximum Segment Lifetime of 255 seconds.
+Given that the clock ticks once every ms in increments of 2 ^ 14, its recycling
+time is roughly 262 s, which is within the bounds set by the standard.
+
+While the quickly-increasing timestamp is benign to active subflows,
+PAWS will still cause segments to be dropped if the subflow in question had been idle for
+a period longer than the clock's recycling time.
+To solve this, the server periodically sends keepalive messages during idle periods.
+
+	
+#### Redirecting packets without timestamps
+
+Some packets (most notably FINs) do not contain timestamps or any other
+connection-identifying information.
+As such, they are forwarded to a server based on a hash of the 5-tuple.
+
+As seen in Section 2.2.2.1 and Section 2.2.2.2,
+whenever a new subflow is setup, the server responsible for it (A) also knows
+which other server (B) would be hit by the packets in case 5-tuple hashing is used.
+
+A will use a simple peer-to-peer protocol to inform B to setup a redirection rule for
+the 5-tuple in question. The redirection rule will be deleted by B either at A's request,
+after the subflow has finished, or after a timeout. We do not discuss the specifics of the
+protocol in this document.
+
+Redirection of a packet is performed using IP-in-IP encapsulation.
 
 
 Application Layer Authentication (Christoph, Alan)
