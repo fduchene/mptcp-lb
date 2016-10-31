@@ -2,7 +2,7 @@
 title: Multipath TCP Load Balancing
 abbrev: MPTCP LB
 docname: draft-duchene-mptcp-load-balancing-00
-date: 2016-08-10
+date: 2016-10-31
 category: exp
 
 
@@ -21,15 +21,15 @@ author:
   organization: UCLouvain
   email: fabien.duchene@uclouvain.be
  -
-  ins: O. Bonaventure
-  name: Olivier Bonaventure
-  organization: UCLouvain
-  email: Olivier.Bonaventure@uclouvain.be
- -
   ins: V. Olteanu
   name: Vladimir Olteanu
   organization: University Politehnica of Bucharest
   email: vladimir.olteanu@cs.pub.ro
+ -
+  ins: O. Bonaventure
+  name: Olivier Bonaventure
+  organization: UCLouvain
+  email: Olivier.Bonaventure@uclouvain.be
  -
   ins: C. Raiciu
   name: Costin Raiciu
@@ -51,9 +51,8 @@ informative:
 
 --- abstract
 
-Multipath TCP {{RFC6824}} may not work behind load balancers. 
 In this document we propose several solutions to allow Multipath TCP
-to work behind load balancers.
+to better work behind load balancers.
 
 --- middle
 
@@ -75,9 +74,10 @@ a simple but important load balancer that does not maintain any per-flow
 state. This load balancer is illustrated in
 {{fig-lb}}. A stateless load balancer can be implemented by hashing
 the five tuple (IP addresses and port numbers) of each incoming packet
-and forward them to one of the servers based on the hash value computed.
+and forwarding them to one of the servers based on the hash value computed.
 With TCP, this load balancer ensures that all the packets that belong to
-one TCP connection are sent to the same server.
+one TCP connection are sent to the same server since each packet contains the five-tuple
+used by the hash function.
 
 ~~~~
 
@@ -90,8 +90,8 @@ one TCP connection are sent to the same server.
 
 
 With Multipath TCP, this approach cannot be used anymore when subflows are
-created by the clients. Such subflows can use any five tuple and thus packets
-belonging to them will be forwarded to any server, not necessarily the
+created by the clients. Such subflows can contain any five tuple and thus packets
+belonging to them will be load-balanced to any server, not necessarily the
 one that was selected by the hashing function for the initial subflow.
 
 In this document, we propose several solutions to allow Multipath TCP to work
@@ -100,18 +100,32 @@ behind load balancers.
 Proposed solutions {#solutions}
 =========================
 
-Modification of the protocol {#protocol}
+Per-server addresses {#protocol}
 ----------------------------
 
-To allow Multipath TCP to work for hosts being hosted behind unmodified
-layer 4 load balancers, we propose to use the unused \"B\" flag in the
-MP\_CAPABLE  option sent (shown in {{fig-mpcap}} in the SYN+ACK. 
-This flag would allow a host behind a layer 4 load balancer to inform 
-the other host that this address  MUST NOT be used to create 
+A first solution is to use two types of public addresses. The load balancer
+uses a public address that is advertised in the DNS. This address is
+used to establish the initial subflow of all Multipath TCP connections.
+In addition to this address, a pool of addresses is used for the servers
+behind the load balancer. One address of this pool is assigned to each server 
+behind the load balancer. This server address is not announced in the DNS
+and only advertised by the servers through the ADD\_ADDR option.
+
+The additional per-server address is used by the clients when they wish to
+create additional subflows. Since each server has its own public address, this
+ensures that the additional subflows are directed to the corresponding server.
+For this solution, we need to ensure that the client never use the public address 
+of the load balancer to initiate subflows. This can be achieved by a slight modification 
+to the MP\_CAPABLE option described below.
+
+To allow Multipath TCP to work for servers behind 
+layer 4 load balancers, we propose to use the reserved \"B\" flag in the
+MP\_CAPABLE option sent (shown in {{fig-mpcap}} in the SYN+ACK. 
+This flag informs the other host that this address MUST NOT be used to create 
 additional subflows.
 
 A host receiving an MP\_CAPABLE with the \"B\" set to 1 MUST NOT try to 
-establish a subflow to the address used in the MP\_CAPABLE. This bit can
+establish a subflow to the source address of the MP\_CAPABLE. This bit can
 also be used in the MP\_CAPABLE option sent in the SYN by a client that
 resides behind a NAT or firewall or does not accept server-initiated 
 subflows.
@@ -137,9 +151,8 @@ subflows.
 ~~~~~~~~~~~~~~~~~~~~~~
 {: #fig-mpcap title="Multipath Capable (MP_CAPABLE) Option"}
 
-This bit can be used by the servers behind a stateless load balancer.
-Each of these servers has a different IP address than the address of the
-load balancer. The servers set the \"B\" flag in the MP\_CAPABLE
+This bit can be used by servers behind a stateless load balancer.
+The servers set the \"B\" flag in the MP\_CAPABLE
 option that they return and advertise their own address by using the 
 ADD\_ADDR option. Upon reception of this option, the clients can
 create the additional subflows towards these addresses. Compared with
@@ -151,23 +164,23 @@ To demonstrate the principle of an off path load balancer let's consider
 a server behind a load balancer.
 
 ~~~~~~~~~~
-         +-- ADSL --+  +-- Load Balancer --+--- ADDR 1 ---+
+         +-- net1 --+  +-- Load Balancer --+--- ADDR 1 ---+
          |          |  |                                  |
 client --+          +--+	                          +--- Server
          |          |  |                                  |
-         +-- LTE  --+  +------------- ADDR 2 -------------+
+         +-- net2 --+  +------------- ADDR 2 -------------+
 ~~~~~~~~~~
 {: #fig-servlb title="A server with 2 addresse."}
 
 
 As shown in figure {{fig-servlb}}, this server has 2 IP addresses:
-1 behind the load balancer and 1 direclty connected to the Internet.
-The client will send a SYN containing an MP\_CAPABLE, the server will
-answer with a SYN+ACK containing an MP\_CAPABLE with the \"B\" flag
+1 behind the load balancer and 1 directly connected to the Internet.
+The client sends a SYN containing an MP\_CAPABLE option, the server 
+answers with a SYN+ACK containing an MP\_CAPABLE with the \"B\" flag
 set to 1.
-Upon reception of the SYN+ACK, the client will now that it cannot establish
-any more subflow with this IP address.
-The load balancer will then advertise it's secondary address with an ADD\_ADDR.
+Upon reception of the SYN+ACK, the client will know that it cannot establish
+any more subflow towards IP address.
+The server will then advertise it's secondary address with an ADD\_ADDR.
 Once the client has established at least one connection to the secondary IP
 address, the server could elect to close the primary subflow or to put it in
 backup mode.
@@ -176,7 +189,7 @@ backup mode.
 Embedding Extra Information in Packets
 -------------------------------------------------
 
-Under some circumstances, addressing the individial servers via tieir individial IPs is not desirable or feasible.
+Under some circumstances, addressing the individial servers via their individial IPs is not desirable or feasible.
 To work around this issue, we propose two mutually-exclusive solutions.
 They rely to varying degrees on getting the client to embed connection or server-identifying
 information in the packets that it sends out. This extra information can be used statelessly by the loadbalancers.
@@ -190,13 +203,13 @@ Our first proposal revolves around controlling the destination port
 that the client uses in all subflows aside from the initial one.
 It is possible for the server to advertise an additional port via the
 ADD_ADDR option {{RFC6824}}. This informs the client
-that it can send an MP_JOIN to this new port and initiate a new subflow.
+that it can send an MP\_JOIN to this new port and initiate a new subflow.
 
 To take advantage of this,
 each server is be assigned a unique 16-bit ID, which must
 be different from the port on which the service is being hosted (e.g. 80).
 As soon as a connection is initiated, the server sends an
-ADD_ADDR to the client advertising a new port equal to said ID.
+ADD\_ADDR to the client advertising a new port equal to said ID.
 
 Packets that arrive at the loadbalancer are treated as follows:
 
@@ -210,7 +223,7 @@ This approach has two drawbacks:
 
 * The client will most likely also try to initiate subflows using the server's original port.
 Because these subflows are loadbalanced based on a hash of their 5-tuple, they will almost certainly reach a different server and break.
-(Using REMOVE_ADDR to prevent the creation of these subflows would entail
+(Using REMOVE\_ADDR to prevent the creation of these subflows would entail
 the destruction of the original subflow.)
 This issue can be solved by the adoption of the protocol modifications outlined in Section 1.
 
@@ -228,15 +241,15 @@ via redirection between the servers.
 	
 #### Connection Initiation
 
-The client initiates an MPTCP connection by sending a SYN with the MP_CAPABLE option.
+The client initiates an MPTCP connection by sending a SYN with the MP\_CAPABLE option.
 Under normal operation, the server then picks a random 64-bit key for the connection,
 and uses it to compute its token.
 
-To forward the packet appropriately, the loadbalancer must know the token before
+To forward the packet appropriately, the load balancer must know the token before
 deciding what server to send it to. To accomplish this, we move the key generation
-to the loadbalancer. The connection's token can be computed based on the generated key.
+to the load balancer. The connection's token can be computed based on the generated key.
 
-The loadbalancer places the generated key, along with the IP of the server that would
+The load balancer places the generated key, along with the IP address of the server that would
 be responsible for the subflow under normal 5-tuple hashing (which we call the alternate
 server IP) in an IP option and forwards the SYN to the server.
 
@@ -276,7 +289,7 @@ The use of the alternate server IP will be discussed in a later section.
 Additional subflows are initiated by the client by sending MP_JOIN packets.
 These packets contain the server's token.
 
-Similarly to how MP_CAPABLE packets are treated, the loadbalancer uses an IP option
+Similarly to how MP\_CAPABLE packets are treated, the load balancer uses an IP option
 to inform the server about which other server would be responsible for the subflow
 under normal 5-tuple hashing.
 
@@ -315,7 +328,8 @@ loadbalancer, it is forwarded based on the 14 least significant bits of the TSec
 ##### Impact on PAWS
 
 Timestamps supplied by the server are used by the client for
-protection against wrapped sequence numbers (PAWS).
+protection against wrapped sequence numbers (PAWS). Note that for Multipath TCP,
+the utilisation of the 64 bits DSN already protects against PAWS.
 
 We assume that the server uses a timestamp clock frequency of 1 tick per ms,
 which is the highest frequency recommended by {{RFC7323}}.
