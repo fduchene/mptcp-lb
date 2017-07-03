@@ -1,8 +1,8 @@
 ---
 title: Multipath TCP Load Balancing
 abbrev: MPTCP LB
-docname: draft-duchene-mptcp-load-balancing-00
-date: 2016-10-31
+docname: draft-duchene-mptcp-load-balancing-01
+date: 2017-06-03
 category: exp
 
 
@@ -35,12 +35,18 @@ author:
   name: Costin Raiciu
   organization: University Politehnica of Bucharest
   email: costin.raiciu@cs.pub.ro
-
+ -
+  ins: A. Ford 
+  name: Alan Ford
+  organization: Pexip
+  email: alan.ford@gmail.com
 
 normative:
   RFC6824:
   RFC0791:
   RFC7323:
+  I-D.paasch-mptcp-application-authentication:
+  I-D.paasch-mptcp-tls-authentication:
 
 informative:
   RFC6182:
@@ -361,6 +367,23 @@ protocol in this document.
 
 Redirection of a packet is performed using IP-in-IP encapsulation.
 
+Application Layer Authentication
+--------------------------------
+
+With similar motivations to 2.2, this proposal {{I-D.paasch-mptcp-application-authentication}}
+decouples the token signalled in the TCP options from the key used in authentication, allowing the 
+token to carry arbitrary information. By allowing the token to be arbitrarily assigned by the sender, 
+a load balancer could embed routing information so it knows which server to forward the packets on 
+the TCP session towards. 
+
+For example, the token could carry a server identifier, a port number, and a signature based on a 
+known secret. Furthermore, by generating tokens directly there is no risk of hash collisions 
+in token generation.
+By allowing the token to be arbitrarily assigned, decoupled from the keys, the authentication of 
+additional subflows is delegated to the application layer. A proposal for the use of TLS for this 
+is defined in {{I-D.paasch-mptcp-tls-authentication}}, 
+whereby keys can be extracted from a TLS session and used to set up additional subflows.
+
 Comparaison of the solutions
 =============================
 
@@ -382,6 +405,14 @@ Extra Information in Packets:
 or changing the value of the timestamps (proposal 2).
 - Doesn't need any modification to the applications.
 - Doesn't disclose the real IP address of the servers.
+
+Application Layer Authentication:
+
+- Doesn’t require public IP addresses
+- Requires support at clients and load balancers
+- Doesn’t disclose IP addresses
+- No greater risk of middle box interference than MPTCP today
+- Additional security through no key exchange in the clear
 
 Recommandations
 ================
@@ -405,8 +436,7 @@ In this document, we have described and compared two solutions to load balance
 MultiPath TCP connections.
 We showed that these two solutions have advantages and drawbacks and cover
 different network configurations.
-Future versions of this draft will include more solutions like the Application
-Layer Authentication and discuss security considerations.
+Future versions of this draft will discuss security considerations.
 
 --- back
 
